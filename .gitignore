@@ -1,0 +1,45 @@
+# Local builds and user files
+**/bin/
+**/obj/
+.vs/
+.idea/
+*.user
+*.suo
+
+# Do not commit proprietary Sea Power / Unity assemblies or installed files
+BepInEx/
+Sea Power_Data/
+StreamingAssets/
+*.dll
+*.pdb
+*.bak-*
+
+# Editor/OS noise
+.DS_Store
+Thumbs.db
+
+# Public release artifacts (generated locally)
+dist/
+*.zip
+*.nupkg
+
+# Experimental Workshop builds
+workshop-test-output/
+
+# Workshop WIP1 generated output and safety backups
+_workshop-test/
+
+_viewforge-test/
+.vscode/
+*.user
+
+# Audit build output
+**/bin/
+**/obj/
+
+# Guarded local v1 release builds, release archives and backups
+_camera-workspace-v1-release/
+_camera-workspace-*-test/
+_camera-workspace-*-release/
+dist/
+*.zip

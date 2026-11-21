@@ -1,0 +1,68 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>CustomCameraOffset</AssemblyName>
+    <RootNamespace>CustomCameraOffset</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <Version>1.0.0</Version>
+    <GameDir>$(SP_CCO_GAME_DIR)</GameDir>
+    <ManagedDir>$(SP_CCO_MANAGED_DIR)</ManagedDir>
+    <!-- Only the Workshop build uses Anchor Chain's compile-only assembly. -->
+    <DefineConstants Condition="'$(WorkshopBuild)' == 'true'">$(DefineConstants);ANCHORCHAIN_WORKSHOP</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(WorkshopBuild)' == 'true'">
+    <Reference Include="AnchorChain">
+      <HintPath>$(AnchorChainDll)</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="0Harmony">
+      <HintPath>$(GameDir)\BepInEx\core\0Harmony.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(GameDir)\BepInEx\core\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <!-- The BepInEx 5 BaseUnityPlugin dependency references UnityEngine,
+         even on Unity versions that split implementations into *Module.dll. -->
+    <!-- Game window geometry & Noesis WPF-like UI (compile-only; game supplies the DLLs). -->
+    <Reference Include="Seapower-Scripts">
+      <HintPath>$(ManagedDir)\Seapower-Scripts.dll</HintPath><Private>false</Private>
+    </Reference>
+    <Reference Include="Noesis.NoesisGUI">
+      <HintPath>$(ManagedDir)\Noesis.NoesisGUI.dll</HintPath><Private>false</Private>
+    </Reference>
+    <Reference Include="Libraries">
+      <HintPath>$(ManagedDir)\Libraries.dll</HintPath><Private>false</Private>
+    </Reference>
+    <Reference Include="UniRx">
+      <HintPath>$(ManagedDir)\UniRx.dll</HintPath><Private>false</Private>
+    </Reference>
+    <Reference Include="CommunityToolkit.Mvvm">
+      <HintPath>$(ManagedDir)\CommunityToolkit.Mvvm.dll</HintPath><Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(ManagedDir)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(ManagedDir)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.InputLegacyModule">
+      <HintPath>$(ManagedDir)\UnityEngine.InputLegacyModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.IMGUIModule">
+      <HintPath>$(ManagedDir)\UnityEngine.IMGUIModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+</Project>
