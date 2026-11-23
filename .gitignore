@@ -43,3 +43,5 @@ _camera-workspace-*-test/
 _camera-workspace-*-release/
 dist/
 *.zip
+
+_camera-workspace-v101-rc1-test/

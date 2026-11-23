@@ -9,13 +9,13 @@ using UnityEngine.Rendering;
 
 namespace CustomCameraOffset
 {
-    [BepInPlugin("local.seapower.customcameraoffset", "Camera Offset & Workspace Snapshots", "1.0.0")]
+    [BepInPlugin("local.seapower.customcameraoffset", "Camera Offset & Workspace Snapshots", "1.0.1")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private const float MaximumOffset = 0.40f; // Fraction of the entire viewport.
         private const float WindowWidth = 442f;
-        private const float CollapsedHeight = 522f;
-        private const float ExpandedHeight = 760f;
+        private const float CollapsedHeight = 560f;
+        private const float ExpandedHeight = 798f;
         private const float LauncherWidth = 164f;
         private const float LauncherHeight = 26f;
         private const int LauncherWindowId = 751192;
@@ -93,6 +93,7 @@ namespace CustomCameraOffset
                 "Normalized horizontal position of the small launcher; -1 uses upper right.");
             _launcherYSetting = Config.Bind("General", "MiniLauncherY", -1f,
                 "Normalized vertical position of the small launcher; -1 uses near the top.");
+            BindUiScaleConfig();
             BindSavedLayouts();
             BindAutoCenterConfig();
             BindWorkspaceConfig();
@@ -106,7 +107,7 @@ namespace CustomCameraOffset
             // if the other pipeline is active. Also apply in LateUpdate as a backup.
             Camera.onPreCull += OnCameraPreCull;
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
-            Logger.LogInfo("Camera Offset & Workspace Snapshots v1.0.0 loaded; labeled mini launcher, graphical quick layouts and collapsible snapshots.");
+            Logger.LogInfo("Camera Offset & Workspace Snapshots v1.0.1 RC2 loaded; labeled mini launcher, graphical quick layouts and collapsible snapshots.");
         }
 
         private void OnDestroy()
@@ -149,6 +150,8 @@ namespace CustomCameraOffset
                     !_launcherMouseCaptured && !PointerWithinLauncher())
                     ClosePanelAndRestoreInput();
                 _previousLeftMouseDown = leftDown;
+                // Fallback when IMGUI consumes the mouse-up outside our window.
+                if (!leftDown && _uiScalePendingPercent >= 0) CommitPendingUiScale();
                 if (!leftDown && _launcherPendingSave) SaveLauncherPosition();
                 PollWorldFocusHandoff();
                 UpdateMouseCapture();
@@ -410,14 +413,14 @@ namespace CustomCameraOffset
         {
             // Input.mousePosition has bottom-left origin; IMGUI Rect has top-left.
             Vector3 pos = Input.mousePosition;
-            return _window.Contains(new Vector2(pos.x, Screen.height - pos.y));
+            return _window.Contains(new Vector2(pos.x / _uiScale, (Screen.height - pos.y) / _uiScale));
         }
 
         private bool PointerWithinLauncher()
         {
             if (!_launcherEnabledSetting.Value || !IsMission3DReady()) return false;
             Vector3 p = Input.mousePosition;
-            return _launcherWindow.Contains(new Vector2(p.x, Screen.height - p.y));
+            return _launcherWindow.Contains(new Vector2(p.x / _uiScale, (Screen.height - p.y) / _uiScale));
         }
 
         private void UpdateLauncherMouseCapture()
@@ -433,8 +436,8 @@ namespace CustomCameraOffset
 
         private void SaveLauncherPosition()
         {
-            float maxX = Mathf.Max(1f, Screen.width - LauncherWidth);
-            float maxY = Mathf.Max(1f, Screen.height - LauncherHeight);
+            float maxX = Mathf.Max(1f, Screen.width / _uiScale - LauncherWidth);
+            float maxY = Mathf.Max(1f, Screen.height / _uiScale - LauncherHeight);
             _launcherXSetting.Value = Mathf.Clamp01(_launcherWindow.x / maxX);
             _launcherYSetting.Value = Mathf.Clamp01(_launcherWindow.y / maxY);
             _launcherPendingSave = false;
@@ -550,58 +553,78 @@ namespace CustomCameraOffset
         {
             if (!IsMission3DReady()) return;
 
-            if (_launcherEnabledSetting.Value)
+            // Work in logical (unscaled) IMGUI coordinates. Unity's GUI transform
+            // scales visuals and UI hit regions together. We additionally convert
+            // the physical mouse coordinates in the input guard (above).
+            RefreshUiScale();
+            float logicalWidth = Screen.width / _uiScale;
+            float logicalHeight = Screen.height / _uiScale;
+            Matrix4x4 previousMatrix = GUI.matrix;
+            int previousDepth = GUI.depth;
+            try
             {
-                if (!_launcherPositionInitialized)
-                {
-                    float maxX = Mathf.Max(0f, Screen.width - LauncherWidth);
-                    float maxY = Mathf.Max(0f, Screen.height - LauncherHeight);
-                    _launcherWindow.x = _launcherXSetting.Value < 0f ?
-                        Mathf.Max(0f, Screen.width - LauncherWidth - 36f) : Mathf.Clamp01(_launcherXSetting.Value) * maxX;
-                    _launcherWindow.y = _launcherYSetting.Value < 0f ?
-                        Mathf.Min(46f, maxY) : Mathf.Clamp01(_launcherYSetting.Value) * maxY;
-                    _launcherPositionInitialized = true;
-                }
-                _launcherWindow.x = Mathf.Clamp(_launcherWindow.x, 0f, Mathf.Max(0f, Screen.width - LauncherWidth));
-                _launcherWindow.y = Mathf.Clamp(_launcherWindow.y, 0f, Mathf.Max(0f, Screen.height - LauncherHeight));
-                int depth = GUI.depth;
-                GUI.depth = -1100;
-                Rect before = _launcherWindow;
-                _launcherWindow = GUI.Window(LauncherWindowId, _launcherWindow, DrawLauncher,
-                    "", GUI.skin.box);
-                if (!Mathf.Approximately(before.x, _launcherWindow.x) ||
-                    !Mathf.Approximately(before.y, _launcherWindow.y))
-                    _launcherPendingSave = true;
-                GUI.depth = depth;
-            }
+                GUI.matrix = previousMatrix * Matrix4x4.Scale(new Vector3(_uiScale, _uiScale, 1f));
 
-            if (!_visible) return;
-            float availableHeight = Mathf.Max(480f, Screen.height - 16f);
-            float desiredHeight = _workspacePage ? ExpandedHeight : CollapsedHeight;
-            _window.height = Mathf.Min(desiredHeight, availableHeight);
-            _window.width = WindowWidth;
-            if (_recenterOnNextDraw || Screen.width != _previousWidth || Screen.height != _previousHeight)
-            {
-                _window.x = Mathf.Max(0f, (Screen.width - WindowWidth) / 2f);
-                _window.y = Mathf.Max(0f, (Screen.height - _window.height) / 2f);
-                _previousWidth = Screen.width;
-                _previousHeight = Screen.height;
-                _recenterOnNextDraw = false;
+                if (_launcherEnabledSetting.Value)
+                {
+                    if (!_launcherPositionInitialized)
+                    {
+                        float maxX = Mathf.Max(0f, logicalWidth - LauncherWidth);
+                        float maxY = Mathf.Max(0f, logicalHeight - LauncherHeight);
+                        _launcherWindow.x = _launcherXSetting.Value < 0f ?
+                            Mathf.Max(0f, logicalWidth - LauncherWidth - 36f / _uiScale) :
+                            Mathf.Clamp01(_launcherXSetting.Value) * maxX;
+                        _launcherWindow.y = _launcherYSetting.Value < 0f ?
+                            Mathf.Min(46f / _uiScale, maxY) :
+                            Mathf.Clamp01(_launcherYSetting.Value) * maxY;
+                        _launcherPositionInitialized = true;
+                    }
+                    _launcherWindow.x = Mathf.Clamp(_launcherWindow.x, 0f,
+                        Mathf.Max(0f, logicalWidth - LauncherWidth));
+                    _launcherWindow.y = Mathf.Clamp(_launcherWindow.y, 0f,
+                        Mathf.Max(0f, logicalHeight - LauncherHeight));
+                    GUI.depth = -1100;
+                    Rect before = _launcherWindow;
+                    _launcherWindow = GUI.Window(LauncherWindowId, _launcherWindow, DrawLauncher,
+                        "", GUI.skin.box);
+                    if (!Mathf.Approximately(before.x, _launcherWindow.x) ||
+                        !Mathf.Approximately(before.y, _launcherWindow.y))
+                        _launcherPendingSave = true;
+                }
+
+                if (!_visible) return;
+                float availableHeight = Mathf.Max(480f, logicalHeight - 16f / _uiScale);
+                float desiredHeight = _workspacePage ? ExpandedHeight : CollapsedHeight;
+                _window.height = Mathf.Min(desiredHeight, availableHeight);
+                _window.width = WindowWidth;
+                if (_recenterOnNextDraw || Screen.width != _previousWidth ||
+                    Screen.height != _previousHeight)
+                {
+                    _window.x = Mathf.Max(0f, (logicalWidth - WindowWidth) / 2f);
+                    _window.y = Mathf.Max(0f, (logicalHeight - _window.height) / 2f);
+                    _previousWidth = Screen.width;
+                    _previousHeight = Screen.height;
+                    _recenterOnNextDraw = false;
+                }
+                _window.x = Mathf.Clamp(_window.x, 0f, Mathf.Max(0f, logicalWidth - WindowWidth));
+                _window.y = Mathf.Clamp(_window.y, 0f, Mathf.Max(0f, logicalHeight - _window.height));
+                GUI.depth = -1000;
+                _window = GUI.Window(WindowId, _window, DrawWindow,
+                    "Camera Offset & Workspace Snapshots v1.0.1");
+                GUI.BringWindowToFront(WindowId);
+                Event ev = Event.current;
+                if (ev != null && ev.isMouse &&
+                    (PointerWithinWindow() || _mouseDragCaptured) &&
+                    ev.type != EventType.Used && ev.type != EventType.Layout &&
+                    ev.type != EventType.Repaint)
+                    ev.Use();
             }
-            _window.x = Mathf.Clamp(_window.x, 0f, Mathf.Max(0f, Screen.width - WindowWidth));
-            _window.y = Mathf.Clamp(_window.y, 0f, Mathf.Max(0f, Screen.height - _window.height));
-            int oldGuiDepth = GUI.depth;
-            GUI.depth = -1000;
-            _window = GUI.Window(WindowId, _window, DrawWindow,
-                "Camera Offset & Workspace Snapshots v1.0.0");
-            GUI.BringWindowToFront(WindowId);
-            Event ev = Event.current;
-            if (ev != null && ev.isMouse &&
-                (_window.Contains(ev.mousePosition) || _mouseDragCaptured) &&
-                ev.type != EventType.Used && ev.type != EventType.Layout &&
-                ev.type != EventType.Repaint)
-                ev.Use();
-            GUI.depth = oldGuiDepth;
+            finally
+            {
+                // Never leak our transform or depth into Sea Power or another mod.
+                GUI.matrix = previousMatrix;
+                GUI.depth = previousDepth;
+            }
         }
 
         private void DrawLauncher(int id)
@@ -680,7 +703,8 @@ namespace CustomCameraOffset
 
             // Foldout: snapshots hidden by default. No separate full-screen page.
             float footerY = _window.height - 64f;
-            float foldoutBottom = footerY - 8f;
+            float scaleRowY = footerY - 38f;
+            float foldoutBottom = scaleRowY - 8f;
             GUI.Box(new Rect(13f, 394f, WindowWidth - 26f,
                 Mathf.Max(38f, foldoutBottom - 394f)), "");
             if (GUI.Button(new Rect(21f, 399f, 399f, 27f),
@@ -688,9 +712,11 @@ namespace CustomCameraOffset
                     "+  MY WORKSPACES  |  4 saved snapshots"))
                 _workspacePage = !_workspacePage;
             if (_workspacePage)
-                DrawInlineWorkspaces(footerY);
+                DrawInlineWorkspaces(scaleRowY - 1f);
 
-            // Three separate footer rows eliminate the former clipping/overlap.
+            DrawUiScaleControls(scaleRowY);
+
+            // Separate footer lines avoid clipping/overlap.
             GUI.Label(new Rect(20f, footerY + 3f, 401f, 19f),
                 _workspacePage ? _workspaceMessage : _tacticalStatus);
             bool miniNow = GUI.Toggle(new Rect(20f, footerY + 25f, 145f, 22f),

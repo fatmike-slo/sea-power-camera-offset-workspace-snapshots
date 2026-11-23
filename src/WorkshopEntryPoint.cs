@@ -13,7 +13,7 @@ namespace CustomCameraOffset
     /// Anchor Chain entry point. Compiled only in the Workshop build.
     /// The normal BepInEx version remains independent of this code.
     /// </summary>
-    [ACPlugin("local.seapower.customcameraoffset", "Camera Offset & Workspace Snapshots", "1.0.0")]
+    [ACPlugin("local.seapower.customcameraoffset", "Camera Offset & Workspace Snapshots", "1.0.1")]
     public sealed class WorkshopEntryPoint : IAnchorChainMod
     {
         // Shared across Assembly.LoadFile copies: Assembly static fields are NOT shared there.
@@ -53,10 +53,10 @@ namespace CustomCameraOffset
                 }
 
                 AppDomain.CurrentDomain.SetData(LoadedMarker, true);
-                _host = new GameObject("Camera Offset & Workspace Snapshots (Anchor Chain v1.0.0)");
+                _host = new GameObject("Camera Offset & Workspace Snapshots (Anchor Chain v1.0.1)");
                 Object.DontDestroyOnLoad(_host);
                 _host.AddComponent<Plugin>();
-                Debug.Log("[Camera Offset & Workspace Snapshots] Workshop adapter started (v1.0.0).");
+                Debug.Log("[Camera Offset & Workspace Snapshots] Workshop adapter started (v1.0.1).");
             }
             catch (Exception ex)
             {

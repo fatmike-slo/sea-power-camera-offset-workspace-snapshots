@@ -1,362 +1,221 @@
-# CameraOffsetWorkspaceSnapshots — guarded v1.0.0 Anchor Chain local release controller.
-# Windows PowerShell 5.1; no Steam upload, no changes to other installed mods.
+﻿# Guarded v1.0.1 public release controller. Windows PowerShell 5.1.
+# Reuses the exact, in-game-tested RC2 DLL; no rebuild, no Steam credentials, no upload automation.
 [CmdletBinding()]
 param(
-    [ValidateSet('Check', 'Build', 'Package', 'Install', 'Verify', 'Rollback')]
+    [ValidateSet('Check','Package','VerifyPackage','Stage','VerifyStage','Clean','VerifyWorkshop')]
     [string]$Action = 'Check',
-    [string]$GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\Sea Power',
-    [string]$AnchorChainDll = ''
+    [string]$RC2Dir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'sea-power-camera-offset-workspace-snapshots-v1.0.1_RC2'),
+    [string]$GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\Sea Power'
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$testRoot = Join-Path $root '_camera-workspace-v1-release'
-$buildSource = Join-Path $testRoot 'build\src'
-$outputMod = Join-Path $testRoot 'CameraOffsetWorkspaceSnapshots'
-$outputDll = Join-Path $outputMod 'CustomCameraOffset.dll'
-$sourceDll = Join-Path $buildSource 'bin\Release\netstandard2.1\CustomCameraOffset.dll'
+$expectedHash = '787F55887C3BBC30E485087E10D2054835DACCE80DDAB920DAF4437564F0E3C2'
+$rc2Build = Join-Path $RC2Dir '_camera-workspace-v101-rc2-test\CameraOffsetWorkspaceSnapshotsV101RC2Test\CustomCameraOffset.dll'
+$rc2State = Join-Path $RC2Dir '_camera-workspace-v101-rc2-test\test-state.json'
+$rc2Installed = Join-Path $GameDir 'Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshotsV101RC2Test\CustomCameraOffset.dll'
 $manualDll = Join-Path $GameDir 'BepInEx\plugins\CustomCameraOffset\CustomCameraOffset.dll'
-$pluginRoot = Join-Path $GameDir 'BepInEx\plugins'
-$streamingAssets = Join-Path $GameDir 'Sea Power_Data\StreamingAssets'
-$installedMod = Join-Path $streamingAssets 'CameraOffsetWorkspaceSnapshots'
-$installedDll = Join-Path $installedMod 'CustomCameraOffset.dll'
-$installedIni = Join-Path $installedMod '_info.ini'
-$markerFile = Join-Path $installedMod '.camera-workspace-v1-local-install'
-$markerText = 'CameraOffsetWorkspaceSnapshots-Workshop-v1.0.0-local-install'
-$stateFile = Join-Path $testRoot 'test-state.json'
-
-function Assert-GameClosed {
-    if (Get-Process -Name 'Sea Power' -ErrorAction SilentlyContinue) {
-        throw 'Sea Power is currently running. Fully close the game before changing local mod files.'
-    }
-}
-function Get-Hash([string]$file) {
-    return (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToUpperInvariant()
-}
-function Get-GameInfo {
-    if (-not (Test-Path -LiteralPath (Join-Path $GameDir 'Sea Power.exe') -PathType Leaf)) {
-        throw "Sea Power.exe not found: $GameDir"
-    }
-    $managedCandidates = @(Get-ChildItem -LiteralPath $GameDir -Directory -Filter '*_Data' |
-        Where-Object { Test-Path -LiteralPath (Join-Path $_.FullName 'Managed') -PathType Container })
-    if ($managedCandidates.Count -ne 1) {
-        throw "Expected exactly one Unity Managed directory; found $($managedCandidates.Count)."
-    }
-    $managed = Join-Path $managedCandidates[0].FullName 'Managed'
-    $refs = @('Seapower-Scripts.dll','Noesis.NoesisGUI.dll','Libraries.dll','UniRx.dll',
-        'CommunityToolkit.Mvvm.dll','UnityEngine.dll','UnityEngine.CoreModule.dll',
-        'UnityEngine.InputLegacyModule.dll','UnityEngine.IMGUIModule.dll')
-    $missing = @($refs | Where-Object { -not (Test-Path -LiteralPath (Join-Path $managed $_) -PathType Leaf) })
-    foreach ($f in @('BepInEx.dll','0Harmony.dll')) {
-        if (-not (Test-Path -LiteralPath (Join-Path $GameDir "BepInEx\core\$f") -PathType Leaf)) {
-            $missing += "BepInEx/core/$f"
+$workshopDll = Join-Path (Split-Path -Parent (Split-Path -Parent $GameDir)) 'workshop\content\1286220\3844350230\CustomCameraOffset.dll'
+$dist = Join-Path $root 'dist'
+$packageDir = Join-Path $dist 'CameraOffsetWorkspaceSnapshots'
+$packageDll = Join-Path $packageDir 'CustomCameraOffset.dll'
+$packageIni = Join-Path $packageDir '_info.ini'
+$packageZip = Join-Path $dist 'CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip'
+$packageState = Join-Path $dist 'v1.0.1-release-state.json'
+$stageDir = Join-Path $GameDir 'Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshots_v101_Upload'
+$stageState = Join-Path $dist 'v1.0.1-workshop-stage.json'
+function HashOf([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToUpperInvariant() }
+function RequireFile([string]$p) { if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { throw "Expected file is missing: $p" } }
+function RequireClosed { if (Get-Process -Name 'Sea Power' -ErrorAction SilentlyContinue) { throw 'Fully exit Sea Power before changing files.' } }
+function RequireTestDll {
+    RequireFile $rc2Build
+    $h = HashOf $rc2Build
+    if ($h -ne $expectedHash) { throw "RC2 DLL differs from tested build. Expected $expectedHash; got $h" }
+    if (Test-Path -LiteralPath $rc2State -PathType Leaf) {
+        $s = Get-Content -LiteralPath $rc2State -Raw | ConvertFrom-Json
+        if ($s.Version -ne 'CameraOffsetWorkspaceSnapshots-v1.0.1-rc2' -or
+            $s.StageDllHash -ne $expectedHash -or $s.GameDir -ine $GameDir) {
+            throw 'RC2 test-state does not match the verified DLL/version/game path.'
         }
+        RequireFile $rc2Installed
+        if ((HashOf $rc2Installed) -ne $expectedHash) { throw 'Installed RC2 test DLL differs from tested build.' }
     }
-    if ($missing.Count -gt 0) { throw "Missing Sea Power/BepInEx reference DLL(s): $($missing -join ', ')" }
-    return [pscustomobject]@{ ManagedDir = $managed }
+    Write-Host "TESTED RC2 DLL VERIFIED: $h" -ForegroundColor Green
 }
-function Resolve-AnchorChainDll {
-    if ($AnchorChainDll) {
-        if (-not (Test-Path -LiteralPath $AnchorChainDll -PathType Leaf)) {
-            throw "Specified AnchorChain.dll not found: $AnchorChainDll"
-        }
-        return (Resolve-Path -LiteralPath $AnchorChainDll).Path
+function VerifySources {
+    RequireFile (Join-Path $root 'SOURCE_SHA256SUMS.txt')
+    $manifest = Get-Content -LiteralPath (Join-Path $root 'SOURCE_SHA256SUMS.txt')
+    foreach ($line in $manifest) {
+        if ($line -notmatch '^([0-9A-F]{64})  (src/[A-Za-z0-9._/-]+)$') { throw "Invalid source hash entry: $line" }
+        $expected = $Matches[1]
+        $relative = $Matches[2].Replace('/', '\')
+        $path = Join-Path $root $relative
+        RequireFile $path
+        if ((HashOf $path) -ne $expected) { throw "Tested source changed: $relative" }
     }
-    $steamApps = Split-Path -Parent (Split-Path -Parent $GameDir)
-    $locations = @(
-        (Join-Path $steamApps 'workshop\content\1286220\3380210757'),
-        $streamingAssets,
-        $pluginRoot
+    $knownFiles = @($manifest | ForEach-Object { ($_ -split '  ',2)[1] })
+    $actualFiles = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -File | ForEach-Object { 'src/' + $_.Name })
+    if (@($actualFiles | Where-Object { $_ -notin $knownFiles }).Count -ne 0) { throw 'Unexpected source files found.' }
+    $plugin = Get-Content -LiteralPath (Join-Path $root 'src\Plugin.cs') -Raw
+    if ($plugin -notmatch '\[BepInPlugin\("local\.seapower\.customcameraoffset",\s*"Camera Offset & Workspace Snapshots",\s*"1\.0\.1"\)\]') {
+        throw 'Public source is not Camera Offset & Workspace Snapshots v1.0.1.'
+    }
+}
+function VerifyPublicIni {
+    $p = Join-Path $root 'workshop\_info.ini'
+    RequireFile $p
+    $raw = Get-Content -LiteralPath $p -Raw
+    if ($raw -notmatch 'Name=Camera Offset & Workspace Snapshots' -or $raw -notmatch 'v1\.0\.1' -or $raw -match 'TEST|RC2') {
+        throw 'Public Workshop _info.ini is missing or still labelled TEST.'
+    }
+    return $p
+}
+function GetPackage {
+    RequireFile $packageState
+    $s = Get-Content -LiteralPath $packageState -Raw | ConvertFrom-Json
+    if ($s.Version -ne 'v1.0.1' -or $s.DllHash -ne $expectedHash) { throw 'Release state/version/hash mismatch.' }
+    RequireFile $packageDll
+    RequireFile $packageIni
+    RequireFile $packageZip
+    if ((HashOf $packageDll) -ne $s.DllHash -or
+        (HashOf $packageIni) -ne $s.IniHash -or
+        (HashOf $packageZip) -ne $s.ZipHash) { throw 'Release files changed since packaging.' }
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = [System.IO.Compression.ZipFile]::OpenRead($packageZip)
+    try {
+        $entries = @($zip.Entries | Where-Object { $_.Name -ne '' } | ForEach-Object { $_.FullName.Replace('\','/') })
+        $required = @('CameraOffsetWorkspaceSnapshots/CustomCameraOffset.dll','CameraOffsetWorkspaceSnapshots/_info.ini')
+        if ($entries.Count -ne 2 -or @($entries | Where-Object { $_ -notin $required }).Count -gt 0) {
+            throw "ZIP content unexpected: $($entries -join '; ')"
+        }
+    } finally { $zip.Dispose() }
+    return $s
+}
+function RequireNoOtherDlls([string]$allowedDll) {
+    $searchFolders = @(
+        (Join-Path $GameDir 'BepInEx\plugins'),
+        (Join-Path $GameDir 'Sea Power_Data\StreamingAssets'),
+        (Join-Path (Split-Path -Parent (Split-Path -Parent $GameDir)) 'workshop\content\1286220')
     )
     $found = @()
-    foreach ($dir in $locations) {
-        if (-not (Test-Path -LiteralPath $dir -PathType Container)) { continue }
-        $found += @(Get-ChildItem -LiteralPath $dir -Recurse -File -Filter 'AnchorChain.dll' -ErrorAction Stop |
-            Select-Object -ExpandProperty FullName)
-    }
-    $found = @($found | Select-Object -Unique)
-    if ($found.Count -eq 0) {
-        throw 'AnchorChain.dll not found under installed Workshop 3380210757, StreamingAssets or BepInEx/plugins. Pass -AnchorChainDll "FULL\PATH\AnchorChain.dll".'
-    }
-    if ($found.Count -gt 1) {
-        throw "Multiple AnchorChain.dll copies found; choose one with -AnchorChainDll: $($found -join '; ')"
-    }
-    return $found[0]
-}
-function Assert-DotNet8 {
-    if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
-        throw '.NET SDK not found on PATH. The handoff environment uses .NET 8 SDK.'
-    }
-    $sdks = @(& dotnet --list-sdks)
-    if ($LASTEXITCODE -ne 0 -or -not @($sdks | Where-Object { $_ -match '^8\.' }).Count) {
-        throw "Cannot find .NET 8 SDK. Installed SDK(s): $($sdks -join '; ')"
-    }
-    return ($sdks -join '; ')
-}
-function Assert-Source {
-    $p = Join-Path $root 'src\Plugin.cs'
-    $source = Get-Content -LiteralPath $p -Raw
-    if ($source -notmatch '\[BepInPlugin\("local\.seapower\.customcameraoffset",\s*"Camera Offset & Workspace Snapshots",\s*"1\.0\.0"\)\]') {
-        throw 'Expected internal BepInPlugin GUID and v1.0.0 display name/version were not found.'
-    }
-    $w = Get-Content -LiteralPath (Join-Path $root 'src\WorkshopEntryPoint.cs') -Raw
-    if ($w -notmatch 'IAnchorChainMod' -or $w -notmatch 'ANCHORCHAIN_WORKSHOP') {
-        throw 'Anchor Chain adapter source is missing.'
-    }
-}
-function Find-CopiesOutsideExpected {
-    # Detect another installed manual DLL, local mod, or subscribed Workshop copy.
-    $bad = @()
-    $steamApps = Split-Path -Parent (Split-Path -Parent $GameDir)
-    $steamWorkshopMods = Join-Path $steamApps 'workshop\content\1286220'
-    foreach ($folder in @($pluginRoot,$streamingAssets,$steamWorkshopMods)) {
-        if (-not (Test-Path -LiteralPath $folder -PathType Container)) { continue }
-        $bad += @(Get-ChildItem -LiteralPath $folder -Recurse -File -Filter 'CustomCameraOffset.dll' |
-            Where-Object { $_.FullName -ine $manualDll -and $_.FullName -ine $installedDll } |
-            Select-Object -ExpandProperty FullName)
-    }
-    return @($bad | Select-Object -Unique)
-}
-function Write-CurrentStatus {
-    $extra = @(Find-CopiesOutsideExpected)
-    [pscustomobject]@{
-        GameDir = $GameDir
-        ManualDllPresent = (Test-Path -LiteralPath $manualDll -PathType Leaf)
-        LocalWorkshopTestPresent = (Test-Path -LiteralPath $installedDll -PathType Leaf)
-        TestStatePresent = (Test-Path -LiteralPath $stateFile -PathType Leaf)
-        ExtraCopiesDetected = ($extra -join '; ')
-    } | Format-List
-}
-function Run-Check {
-    $game = Get-GameInfo
-    Assert-Source
-    $sdk = Assert-DotNet8
-    $anchorDll = Resolve-AnchorChainDll
-    Write-Host 'CAMERA OFFSET & WORKSPACE SNAPSHOTS v1.0.0 — read-only preflight OK' -ForegroundColor Green
-    [pscustomobject]@{
-        ManagedDir = $game.ManagedDir
-        DotNetSDK = $sdk
-        AnchorChainDll = $anchorDll
-        AnchorChainFileVersion = ([System.Diagnostics.FileVersionInfo]::GetVersionInfo($anchorDll).FileVersion)
-        SeaPowerRunning = [bool](Get-Process -Name 'Sea Power' -ErrorAction SilentlyContinue)
-    } | Format-List
-    Write-CurrentStatus
-    if ((Find-CopiesOutsideExpected).Count -gt 0) {
-        Write-Warning 'Extra copies detected. Install is blocked until their location is resolved.'
-    }
-}
-function Run-Build {
-    $game = Get-GameInfo
-    Assert-Source
-    [void](Assert-DotNet8)
-    $anchorDll = Resolve-AnchorChainDll
-    if (Test-Path -LiteralPath $stateFile) {
-        throw 'A local release is installed; Rollback before building another release to avoid hash/version confusion.'
-    }
-    if (Test-Path -LiteralPath $buildSource) {
-        Remove-Item -LiteralPath $buildSource -Recurse -Force
-    }
-    New-Item -ItemType Directory -Force -Path $buildSource,$outputMod | Out-Null
-    Get-ChildItem -LiteralPath (Join-Path $root 'src') -File |
-        Where-Object { $_.Extension -in '.cs', '.csproj' } |
-        ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $buildSource -Force }
-    $env:SP_CCO_GAME_DIR = $GameDir
-    $env:SP_CCO_MANAGED_DIR = $game.ManagedDir
-    $project = Join-Path $buildSource 'CustomCameraOffset.csproj'
-    & dotnet build $project -c Release --nologo --no-incremental '-p:WorkshopBuild=true' "-p:AnchorChainDll=$anchorDll"
-    if ($LASTEXITCODE -ne 0) { throw 'Workshop compilation FAILED. No game files modified; do not Install.' }
-    if (-not (Test-Path -LiteralPath $sourceDll -PathType Leaf)) {
-        throw 'dotnet exited successfully but did not create CustomCameraOffset.dll; do not Install.'
-    }
-    Copy-Item -LiteralPath $sourceDll -Destination $outputDll -Force
-    Copy-Item -LiteralPath (Join-Path $root 'workshop\_info.ini') -Destination $outputMod -Force
-    $builtHash = Get-Hash $outputDll
-    Write-Host "BUILD OK (compile-only, NOT runtime tested): $outputDll" -ForegroundColor Green
-    Write-Host "SHA256: $builtHash"
-    Write-Host 'No installed game files were changed. Next: -Action Package, or -Action Install (game must be closed).'
-}
-function Run-Install {
-    Assert-GameClosed
-    [void](Get-GameInfo)
-    if (-not (Test-Path -LiteralPath $outputDll -PathType Leaf)) {
-        throw 'No compiled Workshop DLL found. Run -Action Build first; do not install unbuilt source.'
-    }
-    if (-not (Test-Path -LiteralPath (Join-Path $outputMod '_info.ini') -PathType Leaf)) {
-        throw 'Built Workshop _info.ini is missing. Re-run Build.'
-    }
-    if (Test-Path -LiteralPath $stateFile) { throw 'Release already installed; Rollback before another Install.' }
-    if (Test-Path -LiteralPath $installedMod) {
-        throw "Refusing to touch an existing mod folder: $installedMod. Inspect it; only this script's new folder may be staged."
-    }
-    $other = @(Find-CopiesOutsideExpected)
-    if ($other.Count -gt 0) { throw "Other CustomCameraOffset.dll copies exist. Resolve first: $($other -join '; ')" }
-    $hadManual = Test-Path -LiteralPath $manualDll -PathType Leaf
-    $manualHash = if ($hadManual) { Get-Hash $manualDll } else { '' }
-    $backupPath = ''
-    if ($hadManual) {
-        $backups = Join-Path $testRoot 'backups'
-        New-Item -Path $backups -ItemType Directory -Force | Out-Null
-        $backupPath = Join-Path $backups ("CustomCameraOffset.dll.manual-" + (Get-Date -Format 'yyyyMMdd-HHmmssfff'))
-    }
-    $dllHash = Get-Hash $outputDll
-    $iniHash = Get-Hash (Join-Path $outputMod '_info.ini')
-    try {
-        if ($hadManual) {
-            Move-Item -LiteralPath $manualDll -Destination $backupPath -ErrorAction Stop
-        }
-        New-Item -ItemType Directory -Path $installedMod -ErrorAction Stop | Out-Null
-        Copy-Item -LiteralPath $outputDll -Destination $installedDll -ErrorAction Stop
-        Copy-Item -LiteralPath (Join-Path $outputMod '_info.ini') -Destination $installedIni -ErrorAction Stop
-        Set-Content -LiteralPath $markerFile -Value $markerText -Encoding Ascii -ErrorAction Stop
-        $state = [pscustomobject]@{
-            Version = 'CameraOffsetWorkspaceSnapshots-v1.0.0'; GameDir = $GameDir
-            HadManual = [bool]$hadManual; BackupPath = $backupPath; ManualHash = $manualHash
-            StageDllHash = $dllHash; StageIniHash = $iniHash
-        }
-        $state | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stateFile -Encoding UTF8 -ErrorAction Stop
-    }
-    catch {
-        # Only freshly created stage files; never touch other mod directories or configuration.
-        if (Test-Path -LiteralPath $markerFile) { Remove-Item -LiteralPath $markerFile -Force }
-        if (Test-Path -LiteralPath $installedDll) { Remove-Item -LiteralPath $installedDll -Force }
-        if (Test-Path -LiteralPath $installedIni) { Remove-Item -LiteralPath $installedIni -Force }
-        if ((Test-Path -LiteralPath $installedMod) -and
-            -not @(Get-ChildItem -LiteralPath $installedMod -Force).Count) {
-            Remove-Item -LiteralPath $installedMod -Force
-        }
-        if ($hadManual -and (Test-Path -LiteralPath $backupPath) -and -not (Test-Path -LiteralPath $manualDll)) {
-            Move-Item -LiteralPath $backupPath -Destination $manualDll
-        }
-        if (Test-Path -LiteralPath $stateFile) { Remove-Item -LiteralPath $stateFile -Force }
-        throw
-    }
-    Write-Host 'INSTALL OK — LOCAL RELEASE; previous manual DLL backed up outside BepInEx/plugins.' -ForegroundColor Green
-    Write-Host "Local release mod: $installedMod"
-    if ($hadManual) { Write-Host "Stable manual DLL backup: $backupPath" }
-    Write-Host 'Your BepInEx config was not modified. Check -Action Verify, then run a fresh in-game test.'
-}
-function Get-State {
-    if (-not (Test-Path -LiteralPath $stateFile -PathType Leaf)) {
-        throw 'No local v1.0.0 installation state exists; cannot safely identify files for rollback.'
-    }
-    $state = Get-Content -LiteralPath $stateFile -Raw | ConvertFrom-Json
-    if ($state.Version -ne 'CameraOffsetWorkspaceSnapshots-v1.0.0' -or $state.GameDir -ine $GameDir) {
-        throw 'State mismatch: different game directory or test version. Refusing to modify game files.'
-    }
-    return $state
-}
-function Assert-StageUnmodified($state) {
-    if (-not (Test-Path -LiteralPath $markerFile -PathType Leaf) -or
-        (Get-Content -LiteralPath $markerFile -Raw).Trim() -ne $markerText) {
-        throw 'Local release marker missing/changed. Refusing to delete an unrecognized mod directory.'
-    }
-    if (-not (Test-Path -LiteralPath $installedDll -PathType Leaf) -or
-        (Get-Hash $installedDll) -ne $state.StageDllHash) {
-        throw 'Local release DLL is missing or changed. Refusing automatic removal.'
-    }
-    if (-not (Test-Path -LiteralPath $installedIni -PathType Leaf) -or
-        (Get-Hash $installedIni) -ne $state.StageIniHash) {
-        throw 'Local Workshop _info.ini is missing or changed. Refusing automatic removal.'
-    }
-    $unexpected = @(Get-ChildItem -LiteralPath $installedMod -Force |
-        Where-Object { $_.FullName -ine $installedDll -and $_.FullName -ine $installedIni -and $_.FullName -ine $markerFile })
-    if ($unexpected.Count -ne 0) {
-        throw "Local release directory contains unexpected files. Refusing removal: $($unexpected.FullName -join ', ')"
-    }
-}
-function Run-Verify {
-    if (-not (Test-Path -LiteralPath $stateFile -PathType Leaf)) {
-        Write-Host 'No v1.0.0 installation state. Existing files are untouched.'
-        Write-CurrentStatus
-        return
-    }
-    $state = Get-State
-    Assert-StageUnmodified $state
-    if (Test-Path -LiteralPath $manualDll) {
-        throw 'DUPLICATE: the manual DLL is present while the Workshop test is staged.'
-    }
-    if ($state.HadManual -and ((-not (Test-Path -LiteralPath $state.BackupPath -PathType Leaf)) -or
-        (Get-Hash $state.BackupPath) -ne $state.ManualHash)) {
-        throw 'Original stable DLL backup is missing or changed. Stop testing and inspect the backup.'
-    }
-    $other = @(Find-CopiesOutsideExpected)
-    if ($other.Count -gt 0) { throw "Extra mod DLLs detected: $($other -join '; ')" }
-    Write-Host 'DISK VERIFY OK: exactly one staged local release DLL, manual DLL outside plugins, backup intact.' -ForegroundColor Green
-    Write-Host "Local release SHA256: $($state.StageDllHash)"
-    Write-Host 'This check DOES NOT prove that Anchor Chain or Ctrl+Shift+U loads in-game.'
-    $log = Join-Path $GameDir 'BepInEx\LogOutput.log'
-    if (Test-Path -LiteralPath $log) {
-        Get-Item -LiteralPath $log | Select-Object LastWriteTime,Length | Format-List
-        Write-Host 'Log timestamp above must correspond to the CURRENT game launch; otherwise matches may be stale.'
-        Get-Content -LiteralPath $log -Tail 500 |
-            Select-String 'CameraOffsetWorkspaceSnapshots|CustomCameraOffset|Skipping type|AnchorChain|Exception' |
-            Select-Object -Last 25
-    }
-}
-function Run-Rollback {
-    Assert-GameClosed
-    $state = Get-State
-    Assert-StageUnmodified $state
-    if (Test-Path -LiteralPath $manualDll) {
-        throw 'A manual DLL already exists. Refusing to overwrite; inspect before rollback.'
-    }
-    if ($state.HadManual) {
-        if (-not (Test-Path -LiteralPath $state.BackupPath -PathType Leaf) -or
-            (Get-Hash $state.BackupPath) -ne $state.ManualHash) {
-            throw 'Stable manual backup missing/changed. Staged test has NOT been removed.'
+    foreach ($f in $searchFolders) {
+        if (Test-Path -LiteralPath $f -PathType Container) {
+            $found += @(Get-ChildItem -LiteralPath $f -Recurse -File -Filter 'CustomCameraOffset.dll' -ErrorAction Stop | Select-Object -ExpandProperty FullName)
         }
     }
-    Remove-Item -LiteralPath $installedDll -Force
-    Remove-Item -LiteralPath $installedIni -Force
-    Remove-Item -LiteralPath $markerFile -Force
-    Remove-Item -LiteralPath $installedMod -Force
-    if ($state.HadManual) {
-        $manualParent = Split-Path -Parent $manualDll
-        if (-not (Test-Path -LiteralPath $manualParent)) {
-            New-Item -Path $manualParent -ItemType Directory -Force | Out-Null
-        }
-        Move-Item -LiteralPath $state.BackupPath -Destination $manualDll -ErrorAction Stop
-        if ((Get-Hash $manualDll) -ne $state.ManualHash) {
-            throw 'Restored DLL hash mismatch; inspect manually. State file intentionally retained.'
-        }
-    }
-    Remove-Item -LiteralPath $stateFile -Force
-    Write-Host 'ROLLBACK OK: local test files removed; original manual DLL restored if it existed.' -ForegroundColor Green
-    Write-Host 'BepInEx configuration and all unrelated game files are unchanged.'
+    $unexpected = @($found | Where-Object { $_ -ine $allowedDll })
+    if ($unexpected.Count -gt 0) { throw "Conflicting CustomCameraOffset.dll copy found: $($unexpected -join '; ')" }
 }
-
-
-function Run-Package {
-    if (-not (Test-Path -LiteralPath $outputDll -PathType Leaf)) {
-        throw 'Compiled CustomCameraOffset.dll missing. Run -Action Build first.'
+function GetStaging {
+    RequireFile $stageState
+    $s = Get-Content -LiteralPath $stageState -Raw | ConvertFrom-Json
+    if ($s.Version -ne 'v1.0.1' -or $s.Destination -ine $stageDir -or $s.DllHash -ne $expectedHash) {
+        throw 'Steam staging state mismatch.'
     }
-    if (-not (Test-Path -LiteralPath (Join-Path $outputMod '_info.ini') -PathType Leaf)) {
-        throw 'Workshop metadata missing. Run -Action Build again.'
+    if (-not (Test-Path -LiteralPath $stageDir -PathType Container)) { throw 'Staged directory missing.' }
+    $items = @(Get-ChildItem -LiteralPath $stageDir -Force)
+    if ($items.Count -ne 2 -or @($items | Where-Object { $_.PSIsContainer -or $_.Name -notin @('CustomCameraOffset.dll','_info.ini') }).Count -gt 0) {
+        throw 'Unexpected file(s) in Steam staging directory. Do not clean them automatically.'
     }
-    $dist = Join-Path $root 'dist'
-    New-Item -Path $dist -ItemType Directory -Force | Out-Null
-    $archive = Join-Path $dist 'CameraOffset_WorkspaceSnapshots_v1.0.0_Workshop.zip'
-    if (Test-Path -LiteralPath $archive) {
-        throw "Release archive already exists: $archive. Preserve it and inspect before rebuilding."
+    $dll = Join-Path $stageDir 'CustomCameraOffset.dll'
+    $ini = Join-Path $stageDir '_info.ini'
+    if ((HashOf $dll) -ne $s.DllHash -or (HashOf $ini) -ne $s.IniHash) {
+        throw 'Staged DLL or _info.ini changed.'
     }
-    Compress-Archive -Path $outputMod -DestinationPath $archive -CompressionLevel Optimal -ErrorAction Stop
-    $dllHash = Get-Hash $outputDll
-    $archiveHash = Get-Hash $archive
-    Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Encoding Ascii -Value @(
-        "$dllHash  CustomCameraOffset.dll",
-        "$archiveHash  CameraOffset_WorkspaceSnapshots_v1.0.0_Workshop.zip"
-    )
-    Write-Host "PACKAGE OK: $archive" -ForegroundColor Green
-    Write-Host "DLL SHA256: $dllHash"
-    Write-Host "ZIP SHA256: $archiveHash"
-    Write-Host 'Contains compiled mod DLL and Workshop metadata only; no proprietary game assemblies.'
-    Write-Host 'Zip is a local release candidate. Confirm Windows build, install verification, and in-game test before public release.'
+    return $s
 }
-
 switch ($Action) {
-    'Check' { Run-Check }
-    'Build' { Run-Build }
-    'Package' { Run-Package }
-    'Install' { Run-Install }
-    'Verify' { Run-Verify }
-    'Rollback' { Run-Rollback }
+    'Check' {
+        VerifySources
+        [void](VerifyPublicIni)
+        RequireTestDll
+        [pscustomobject]@{
+            ReleaseSource = $root
+            RC2Build = $rc2Build
+            TestStateExists = (Test-Path -LiteralPath $rc2State)
+            LocalTestDLLExists = (Test-Path -LiteralPath $rc2Installed)
+            ManualPluginExists = (Test-Path -LiteralPath $manualDll)
+            WorkshopSubscribedDllExists = (Test-Path -LiteralPath $workshopDll)
+            PackageExists = (Test-Path -LiteralPath $packageState)
+            StagedForWorkshop = (Test-Path -LiteralPath $stageDir)
+        } | Format-List
+    }
+    'Package' {
+        RequireClosed
+        VerifySources
+        [void](VerifyPublicIni)
+        RequireTestDll
+        if (Test-Path -LiteralPath $packageZip) { throw "Already exists, refusing to overwrite: $packageZip" }
+        if (Test-Path -LiteralPath $packageState) { throw "Release state already exists: $packageState" }
+        if (Test-Path -LiteralPath $packageDir) { throw "Release folder already exists: $packageDir" }
+        New-Item -Path $dist -ItemType Directory -Force | Out-Null
+        New-Item -Path $packageDir -ItemType Directory -Force | Out-Null
+        Copy-Item -LiteralPath $rc2Build -Destination $packageDll -ErrorAction Stop
+        Copy-Item -LiteralPath (Join-Path $root 'workshop\_info.ini') -Destination $packageIni -ErrorAction Stop
+        Compress-Archive -LiteralPath $packageDir -DestinationPath $packageZip -CompressionLevel Optimal -ErrorAction Stop
+        $dllHash = HashOf $packageDll
+        $iniHash = HashOf $packageIni
+        $zipHash = HashOf $packageZip
+        [pscustomobject]@{ Version='v1.0.1'; DllHash=$dllHash; IniHash=$iniHash; ZipHash=$zipHash;
+            TestedRC2Path=$rc2Build; SourceArchiveType='Tested RC2 DLL plus public Workshop metadata';
+            WorkshopItemID='3844350230' } | ConvertTo-Json -Depth 4 |
+                Set-Content -LiteralPath $packageState -Encoding UTF8 -ErrorAction Stop
+        @("$dllHash  CameraOffsetWorkspaceSnapshots/CustomCameraOffset.dll", "${zipHash}  CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip") |
+            Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Encoding Ascii
+        [void](GetPackage)
+        Write-Host 'PUBLIC v1.0.1 PACKAGE OK — tested RC2 DLL reused, unchanged.' -ForegroundColor Green
+        Write-Host "Workshop ZIP: $packageZip"
+        Write-Host "DLL SHA256: $dllHash"
+        Write-Host "ZIP SHA256: $zipHash"
+    }
+    'VerifyPackage' {
+        [void](GetPackage)
+        Write-Host 'VERIFY PACKAGE OK — DLL, metadata, archive and expected version match.' -ForegroundColor Green
+    }
+    'Stage' {
+        RequireClosed
+        $s = GetPackage
+        [void]$s
+        if ((Test-Path -LiteralPath $rc2State -PathType Leaf) -or (Test-Path -LiteralPath $rc2Installed -PathType Leaf)) {
+            throw 'RC2 local test is still installed. Run RC2 -Action Verify then -Action Rollback before Workshop staging.'
+        }
+        if ((Test-Path -LiteralPath $stageState -PathType Leaf) -or (Test-Path -LiteralPath $stageDir)) {
+            throw 'Workshop stage already exists. Inspect it instead of overwriting.'
+        }
+        RequireNoOtherDlls (Join-Path $stageDir 'CustomCameraOffset.dll')
+        New-Item -Path $stageDir -ItemType Directory -ErrorAction Stop | Out-Null
+        Copy-Item -LiteralPath $packageDll -Destination (Join-Path $stageDir 'CustomCameraOffset.dll') -ErrorAction Stop
+        Copy-Item -LiteralPath $packageIni -Destination (Join-Path $stageDir '_info.ini') -ErrorAction Stop
+        [pscustomobject]@{ Version='v1.0.1'; DllHash=$expectedHash; IniHash=HashOf $packageIni;
+            Destination=$stageDir; WorkshopItemID='3844350230' } |
+                ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stageState -Encoding UTF8 -ErrorAction Stop
+        [void](GetStaging)
+        Write-Host 'WORKSHOP STAGE OK — exact two-file upload folder created.' -ForegroundColor Green
+        Write-Host "Pick Folder: $stageDir"
+    }
+    'VerifyStage' {
+        [void](GetStaging)
+        RequireNoOtherDlls (Join-Path $stageDir 'CustomCameraOffset.dll')
+        Write-Host 'VERIFY STAGE OK — exact release DLL, public _info.ini, no extra files.' -ForegroundColor Green
+    }
+    'Clean' {
+        RequireClosed
+        [void](GetStaging)
+        Remove-Item -LiteralPath (Join-Path $stageDir 'CustomCameraOffset.dll') -Force -ErrorAction Stop
+        Remove-Item -LiteralPath (Join-Path $stageDir '_info.ini') -Force -ErrorAction Stop
+        Remove-Item -LiteralPath $stageDir -Force -ErrorAction Stop
+        Remove-Item -LiteralPath $stageState -Force -ErrorAction Stop
+        Write-Host 'WORKSHOP STAGE CLEAN OK — tested package and game configuration untouched.' -ForegroundColor Green
+    }
+    'VerifyWorkshop' {
+        RequireClosed
+        if (Test-Path -LiteralPath $stageDir) { throw 'Temporary upload stage is still present; run Clean.' }
+        if (Test-Path -LiteralPath $rc2Installed) { throw 'Local RC2 test is still installed; run Rollback.' }
+        if (Test-Path -LiteralPath $manualDll) { throw 'Manual BepInEx DLL conflict detected.' }
+        RequireFile $workshopDll
+        $h = HashOf $workshopDll
+        if ($h -ne $expectedHash) { throw "Workshop subscriber DLL is NOT v1.0.1. Expected $expectedHash; got $h. Steam may still be downloading." }
+        RequireNoOtherDlls $workshopDll
+        Write-Host 'WORKSHOP v1.0.1 VERIFY OK — subscribed DLL matches the tested RC2 build.' -ForegroundColor Green
+        Write-Host "Workshop location: $workshopDll"
+    }
 }

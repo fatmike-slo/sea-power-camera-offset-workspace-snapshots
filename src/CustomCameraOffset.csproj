@@ -7,7 +7,7 @@
     <AssemblyName>CustomCameraOffset</AssemblyName>
     <RootNamespace>CustomCameraOffset</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <GameDir>$(SP_CCO_GAME_DIR)</GameDir>
     <ManagedDir>$(SP_CCO_MANAGED_DIR)</ManagedDir>
     <!-- Only the Workshop build uses Anchor Chain's compile-only assembly. -->

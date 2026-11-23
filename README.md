@@ -1,22 +1,26 @@
 # Camera Offset & Workspace Snapshots
 
-A Sea Power mod that gives you more control over your screen. Keep the unit you're watching in view, move the tactical map with a click, and save the window layouts you like.
+A mod for *Sea Power: Naval Combat in the Missile Age* that gives you more control over your screen. Keep your selected unit in view, change the tactical map layout with a click, and save your favorite workspaces.
 
-## What it does
+## Features
 
-- **Better camera framing:** Keep your selected unit visible even when the tactical map takes up part of the screen. Adjust the camera position yourself when needed.
-- **Quick map layouts:** Choose from eight map-and-3D-view layouts with one click.
-- **Your own workspaces:** Save up to four arrangements of the map and other game windows, then bring them back whenever you want. You can also restore one automatically when a mission starts.
-- **Easy access:** Click the small **Camera + Workspace** button in-game or press **Ctrl + Shift + U**.
+- **Adaptive camera:** Keep the selected unit visible beside the tactical map; fine-tune framing with camera offset controls.
+- **Eight quick map layouts:** Switch between map/3D view arrangements with one click.
+- **Four workspace snapshots:** Save and restore supported window arrangements, with optional restore at mission start.
+- **UI scaling (new in v1.0.1):** Auto-size the mod on high-resolution displays or set the size yourself with a 100–200% slider (1% increments). The launcher and main panel both scale; settings persist.
+- **Easy access:** Use the **Camera + Workspace** launcher or **Ctrl + Shift + U**.
 
-## Getting started
+## Installation
 
-When the Steam Workshop version is available, subscribe to the mod and **Anchor Chain**, enable the mod in Sea Power's mod list, and restart the game.
+Subscribe to this mod and **Anchor Chain v1.2** on Steam Workshop, enable both in Sea Power's Mod Manager, then restart the game.
 
-Open **Camera + Workspace** during a mission to adjust the camera, choose a map layout, or save a workspace.
+- [Steam Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3844350230)
+- [Anchor Chain](https://steamcommunity.com/sharedfiles/filedetails/?id=3380210757)
 
-Some game windows need to be opened once before their positions can be restored.
+Some game windows must be opened once before their positions can be restored. Unit Status and Unit Reference window positions may not be restored consistently.
 
-**For building from source:** [Developer instructions](docs/DEVELOPMENT.md).
+## Source and releases
 
-MIT licensed. Unofficial community mod for *Sea Power: Naval Combat in the Missile Age*.
+Requires the installed Sea Power game, Anchor Chain v1.2 and .NET 8 SDK to compile. The release scripts use the already-tested v1.0.1 RC2 DLL and refuse unknown hashes. See [Development and publishing](docs/DEVELOPMENT.md). No proprietary game DLLs are included in this repository.
+
+MIT licensed. An unofficial community mod, not affiliated with the game's developers.

@@ -1,77 +1,120 @@
-# Building and releasing v1.0.0
+# Development and v1.0.1 release
 
-These instructions are for the maintainer. Players only need the [README](../README.md).
+## Compatibility
 
-**Compatibility:** The internal DLL remains `CustomCameraOffset.dll`, plugin GUID `local.seapower.customcameraoffset`, and existing configuration keys remain unchanged. Do not run a manual DLL and a Workshop copy together. The project references Sea Power assemblies from the game installation; none are included in this repository.
+The DLL remains `CustomCameraOffset.dll`, plugin GUID `local.seapower.customcameraoffset`, BepInEx config keys preserved. New keys: `[UI] AutoScale` and `[UI] ScalePercent`. Keep the existing Workshop item ID **3844350230**, required Anchor Chain Workshop item **3380210757** and version **1.2**.
 
-## Build and package (no game files changed)
+## Tested build
 
-Requires Sea Power with BepInEx, Anchor Chain 1.2, and .NET 8 SDK on the Windows build machine. Keep Sea Power closed.
+The developer compiled and tested v1.0.1 RC2 successfully on Windows with Anchor Chain 1.2. The exact compiled DLL SHA-256 is:
+
+`787F55887C3BBC30E485087E10D2054835DACCE80DDAB920DAF4437564F0E3C2`
+
+The final v1.0.1 source is identical to RC2's `src/` files. The only release changes are repository documentation, the published `_info.ini` and packaging controller. Never claim the build was recompiled in the source ZIP: the original tested DLL must be copied from the developer's RC2 test output.
+
+## 1. Prepare public Workshop ZIP (while RC2 is still installed)
+
+Extract this source package as `C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1` alongside the existing RC2 source folder. With the game closed, run:
 
 ```powershell
-cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.0"
+cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1"
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Check
-.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Build
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Package
+.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action VerifyPackage
 ```
 
-A warning from `Check` about the existing WIP4 R1 DLL is expected **before rollback**. Building does not install. The output is `dist/CameraOffset_WorkspaceSnapshots_v1.0.0_Workshop.zip` plus `dist/SHA256SUMS.txt`.
+The controller checks RC2's compiled DLL and its test-state hash, then creates `dist/CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip` with only the tested DLL and clean public `_info.ini`, plus a `SHA256SUMS.txt` and release manifest. An existing output is never silently overwritten.
 
-## Upgrade from the working WIP4 R1
+## 2. Cleanly leave local RC2 testing
 
-Keep both source folders until v1.0.0 is working in-game. With the game closed, use the **original WIP4 R1 controller** to verify and roll back its installation:
+First use the *original RC2 folder* (not this release source). With Sea Power closed:
 
 ```powershell
-cd "C:\Users\fat\Downloads\CameraOffset_WorkspaceSnapshots_WIP4_R1_Source"
+cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1_RC2"
 .\CameraOffsetWorkspaceSnapshotsTest.ps1 -Action Verify
 .\CameraOffsetWorkspaceSnapshotsTest.ps1 -Action Rollback
 ```
 
-If either command fails, stop. Do not delete game files manually.
+The original test script recognizes only its own marker and hashes; it never removes unknown files. Leave Anchor Chain installed. Do not reinstall the obsolete v0.9.0 manual BepInEx plugin. Do not resubscribe to Workshop item 3844350230 yet.
+
+## 3. Publish the source on GitHub
+
+After packaging, update the existing GitHub repository with the source from this archive, review the diff, and push a new `v1.0.1` tag. Upload the newly generated Workshop ZIP and checksums to that GitHub release. Keep the existing v1.0.0 release available and do not force-push. Full Git instructions appear below.
+
+## 4. Prepare Steam upload copy
+
+Back in the release-source folder with the game closed:
 
 ```powershell
-cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.0"
-.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Check
-.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Install
-.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Verify
+cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1"
+.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Stage
+.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action VerifyStage
 ```
 
-Enable the new mod in Sea Power's mod list and **restart the game**. Test the launcher, shortcut, eight layout icons, camera tracking, four workspace snapshots, mission-start restore, and persistent launcher position. Close the game and verify again. If v1.0.0 fails, with the game closed run:
+This creates a controlled temporary upload copy at:
+`C:\Program Files (x86)\Steam\steamapps\common\Sea Power\Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshots_v101_Upload`
+
+Start Sea Power > Mod Manager > Create Mod. Tick **Update Existing**, select the existing **Camera Offset & Workspace Snapshots** entry (Workshop ID **3844350230**), **Pick Folder** and select the exact `CameraOffsetWorkspaceSnapshots_v101_Upload` folder (enter it in the picker if necessary; don't select StreamingAssets itself). Keep existing preview image/title/description, and use `RELEASE_NOTES.md` for the Change Log. Confirm existing-item selection and required Anchor Chain dependency before **Submit Mod**. Do NOT choose Create New or create a second Workshop item. The game's Mod Creation guide confirms the Update Existing flow.
+
+If selecting a preview picture, choose the existing square thumbnail from your **Downloads** folder; do not place the thumbnail into this staging directory.
+
+## 5. Remove upload stage, validate updated subscription
+
+After Steam confirms upload, fully exit Sea Power:
 
 ```powershell
-.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Rollback
+.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action VerifyStage
+.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Clean
 ```
 
-WIP4 R1 can then be reinstalled from its own original source/controller. The new script only removes files it installed and recognizes by recorded state/hash.
+If `Clean` refuses due to extra contents, inspect/move out unexpected files (such as a screenshot added during upload); do not force-delete.
 
-## GitHub repository
-
-Repository: `fatmike-slo/sea-power-camera-offset-workspace-snapshots`  
-Short description: **Keep your ships in view, arrange the tactical map, and save your favorite layouts in Sea Power.**
-
-Run in the source folder after checking `.gitignore` excludes local builds, DLLs and backups:
+Re-subscribe to Workshop item **3844350230** in Steam and wait for Steam to download it; confirm it is enabled in the Sea Power Mod Manager and only one copy loads. With the game closed, run:
 
 ```powershell
-gh auth status
-git init -b main
-git add .
+.\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action VerifyWorkshop
+```
+
+Launch the game, check the version and slider, and verify original camera/workspace features. If the subscribed DLL hash differs, do not delete or overwrite it: check Steam download status before concluding the upload failed.
+
+## GitHub publishing details
+
+From a **clean clone** of the existing repository, copy the updated source and docs, review the changes, and commit without force-pushing. Example:
+
+```powershell
+$source = "$env:USERPROFILE\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1"
+$repo = "$env:USERPROFILE\Downloads\sea-power-camera-offset-workspace-snapshots-github-v101"
+git clone https://github.com/fatmike-slo/sea-power-camera-offset-workspace-snapshots.git $repo
+if ($LASTEXITCODE -ne 0) { throw 'Clone failed' }
+if ((git -C $repo status --porcelain)) { throw 'Clone is not clean' }
+$files = Get-ChildItem -LiteralPath $source -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/]dist[\\/]' }
+foreach ($f in $files) {
+    $relative = $f.FullName.Substring($source.Length).TrimStart('\')
+    $dest = Join-Path $repo $relative
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest) | Out-Null
+    Copy-Item -LiteralPath $f.FullName -Destination $dest -Force
+}
+cd $repo
 git status --short
-git commit -m "Camera Offset & Workspace Snapshots v1.0.0"
-gh repo create fatmike-slo/sea-power-camera-offset-workspace-snapshots --public --source . --remote origin --push
+git diff --check
+git diff --stat
 ```
 
-Only create the repo if it does not already exist. No GitHub repository or release is created by these instructions alone.
-
-**After v1.0.0 passes in-game testing**, publish the binary release:
+Review the source diff before publishing. The test-only files in the old repository should not be kept if unnecessary. Then:
 
 ```powershell
-git tag -a v1.0.0 -m "Camera Offset & Workspace Snapshots v1.0.0"
-git push origin v1.0.0
-gh release create v1.0.0 `
-  .\dist\CameraOffset_WorkspaceSnapshots_v1.0.0_Workshop.zip `
-  .\dist\SHA256SUMS.txt `
-  --title "Camera Offset & Workspace Snapshots v1.0.0" `
-  --notes "Keep your selected unit in view, switch between eight tactical map layouts, and save four custom workspaces. Enable the mod in Sea Power and restart to use it. Requires Anchor Chain."
+git add README.md CHANGELOG.md RELEASE_NOTES.md SOURCE_SHA256SUMS.txt LICENSE .gitignore docs src tools workshop CameraOffsetWorkspaceSnapshotsRelease.ps1 InspectUiMethods.ps1
+git diff --cached --check
+git commit -m "Release v1.0.1: adjustable UI scaling"
+git push origin HEAD
+git tag v1.0.1
+git push origin v1.0.1
 ```
 
-The predecessor repository `fatmike-slo/sea-power-tactical-view-manager` is separate and must remain untouched until explicitly approved for a later change.
+On GitHub, create a release from tag `v1.0.1` and attach `dist/CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip` and `dist/SHA256SUMS.txt`. Use `RELEASE_NOTES.md` as release text. Keep v1.0.0 intact and do not commit the compiled DLL or Sea Power assemblies.
+
+Avoid `git push --force`, removing the repository or making a new Workshop item.
+
+## Rollback after release
+
+The public v1.0.0 GitHub release and its ZIP should remain available. If a regression appears, republish that known-good DLL to the SAME Workshop item using **Update Existing**, then verify Steam subscribers receive the old DLL. Do not activate the legacy `Tactical View Manager` v0.9.0 BepInEx plugin because its GUID conflicts with this mod.
