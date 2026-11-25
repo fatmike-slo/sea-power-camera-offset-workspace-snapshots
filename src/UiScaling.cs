@@ -19,9 +19,9 @@ namespace CustomCameraOffset
             _uiAutoScaleSetting = Config.Bind("UI", "AutoScale", true,
                 "Automatically use a larger mod interface on high-resolution displays. Changeable in-game.");
             _uiScalePercentSetting = Config.Bind("UI", "ScalePercent", 100,
-                new ConfigDescription("Manual interface scaling (100-200%, in steps of 1%). " +
+                new ConfigDescription("Manual interface scaling (100-300%, in steps of 1%). " +
                     "Used when AutoScale is false. Both mod windows and their buttons scale.",
-                    new AcceptableValueRange<int>(100, 200)));
+                    new AcceptableValueRange<int>(100, 300)));
         }
 
         private float RecommendedUiScale()
@@ -36,7 +36,7 @@ namespace CustomCameraOffset
         private float CalculateUiScale()
         {
             float requested = _uiAutoScaleSetting.Value ? RecommendedUiScale() :
-                Mathf.Clamp(_uiScalePercentSetting.Value, 100, 200) / 100f;
+                Mathf.Clamp(_uiScalePercentSetting.Value, 100, 300) / 100f;
 
             // Preserve usable controls on smaller screens. The expanded
             // workspace panel has its own scroll view. Reserve at least 600
@@ -44,7 +44,7 @@ namespace CustomCameraOffset
             // usable even when the workspace panel needs scrolling.
             float widthFit = Mathf.Max(1f, (Screen.width - 24f) / WindowWidth);
             float heightFit = Mathf.Max(1f, (Screen.height - 24f) / 600f);
-            return Mathf.Clamp(Mathf.Min(requested, widthFit, heightFit), 1f, 2f);
+            return Mathf.Clamp(Mathf.Min(requested, widthFit, heightFit), 1f, 3f);
         }
 
         private void RefreshUiScale()
@@ -73,7 +73,7 @@ namespace CustomCameraOffset
 
         private void SetManualUiScale(int percent)
         {
-            percent = Mathf.Clamp(percent, 100, 200);
+            percent = Mathf.Clamp(percent, 100, 300);
             _uiScalePendingPercent = -1;
             if (!_uiAutoScaleSetting.Value && _uiScalePercentSetting.Value == percent) return;
             _uiAutoScaleSetting.Value = false;
@@ -99,8 +99,8 @@ namespace CustomCameraOffset
             // Continuous slider, 1% display precision. Defer applying the GUI
             // transform until release, so it cannot jump away from the cursor.
             float moved = GUI.HorizontalSlider(new Rect(78f, y + 6f, 151f, 17f),
-                displayedPercent, 100f, 200f);
-            int requestedPercent = Mathf.Clamp(Mathf.RoundToInt(moved), 100, 200);
+                displayedPercent, 100f, 300f);
+            int requestedPercent = Mathf.Clamp(Mathf.RoundToInt(moved), 100, 300);
             if (requestedPercent != displayedPercent)
                 _uiScalePendingPercent = requestedPercent;
 

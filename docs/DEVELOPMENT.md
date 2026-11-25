@@ -1,36 +1,36 @@
-# Development and v1.0.1 release
+# Development and v1.0.2 release
 
 ## Compatibility
 
-The DLL remains `CustomCameraOffset.dll`, plugin GUID `local.seapower.customcameraoffset`, BepInEx config keys preserved. New keys: `[UI] AutoScale` and `[UI] ScalePercent`. Keep the existing Workshop item ID **3844350230**, required Anchor Chain Workshop item **3380210757** and version **1.2**.
+The DLL remains `CustomCameraOffset.dll`, plugin GUID `local.seapower.customcameraoffset`, BepInEx config keys preserved. Existing scaling keys: `[UI] AutoScale` and `[UI] ScalePercent` (now up to 300%). Keep the existing Workshop item ID **3844350230**, required Anchor Chain Workshop item **3380210757** and version **1.2**.
 
 ## Tested build
 
-The developer compiled and tested v1.0.1 RC2 successfully on Windows with Anchor Chain 1.2. The exact compiled DLL SHA-256 is:
+The developer compiled and tested v1.0.2 RC1 successfully on Windows with Anchor Chain 1.2. The exact compiled DLL SHA-256 is:
 
-`787F55887C3BBC30E485087E10D2054835DACCE80DDAB920DAF4437564F0E3C2`
+`57C3C417C12CFED185AA217AEDFC5FE2CF5C32D2A7A2B15DAA7AF737EFBB1E33`
 
-The final v1.0.1 source is identical to RC2's `src/` files. The only release changes are repository documentation, the published `_info.ini` and packaging controller. Never claim the build was recompiled in the source ZIP: the original tested DLL must be copied from the developer's RC2 test output.
+The final v1.0.2 source is identical to RC1's `src/` files. The only public-release changes are repository documentation, the published `_info.ini` and packaging controller. Never claim the build was recompiled in the source ZIP: the original tested DLL must be copied from the developer's RC1 test output.
 
-## 1. Prepare public Workshop ZIP (while RC2 is still installed)
+## 1. Prepare public Workshop ZIP (while RC1 is still installed)
 
-Extract this source package as `C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1` alongside the existing RC2 source folder. With the game closed, run:
+Extract this source package as `C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.2` alongside the existing RC1 source folder. With the game closed, run:
 
 ```powershell
-cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1"
+cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.2"
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Check
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Package
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action VerifyPackage
 ```
 
-The controller checks RC2's compiled DLL and its test-state hash, then creates `dist/CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip` with only the tested DLL and clean public `_info.ini`, plus a `SHA256SUMS.txt` and release manifest. An existing output is never silently overwritten.
+The controller checks RC1's compiled DLL and its test-state hash, then creates `dist/CameraOffset_WorkspaceSnapshots_v1.0.2_Workshop.zip` with only the tested DLL and clean public `_info.ini`, plus a `SHA256SUMS.txt` and release manifest. An existing output is never silently overwritten.
 
-## 2. Cleanly leave local RC2 testing
+## 2. Cleanly leave local RC1 testing
 
-First use the *original RC2 folder* (not this release source). With Sea Power closed:
+First use the *original RC1 folder* (not this release source). With Sea Power closed:
 
 ```powershell
-cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1_RC2"
+cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.2_RC1"
 .\CameraOffsetWorkspaceSnapshotsTest.ps1 -Action Verify
 .\CameraOffsetWorkspaceSnapshotsTest.ps1 -Action Rollback
 ```
@@ -39,22 +39,22 @@ The original test script recognizes only its own marker and hashes; it never rem
 
 ## 3. Publish the source on GitHub
 
-After packaging, update the existing GitHub repository with the source from this archive, review the diff, and push a new `v1.0.1` tag. Upload the newly generated Workshop ZIP and checksums to that GitHub release. Keep the existing v1.0.0 release available and do not force-push. Full Git instructions appear below.
+After packaging, update the existing GitHub repository with the source from this archive, review the diff, and push a new `v1.0.2` tag. Upload the newly generated Workshop ZIP and checksums to that GitHub release. Keep the existing v1.0.0 and v1.0.1 releases available and do not force-push. Full Git instructions appear below.
 
 ## 4. Prepare Steam upload copy
 
 Back in the release-source folder with the game closed:
 
 ```powershell
-cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1"
+cd "C:\Users\fat\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.2"
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action Stage
 .\CameraOffsetWorkspaceSnapshotsRelease.ps1 -Action VerifyStage
 ```
 
 This creates a controlled temporary upload copy at:
-`C:\Program Files (x86)\Steam\steamapps\common\Sea Power\Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshots_v101_Upload`
+`C:\Program Files (x86)\Steam\steamapps\common\Sea Power\Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshots_v102_Upload`
 
-Start Sea Power > Mod Manager > Create Mod. Tick **Update Existing**, select the existing **Camera Offset & Workspace Snapshots** entry (Workshop ID **3844350230**), **Pick Folder** and select the exact `CameraOffsetWorkspaceSnapshots_v101_Upload` folder (enter it in the picker if necessary; don't select StreamingAssets itself). Keep existing preview image/title/description, and use `RELEASE_NOTES.md` for the Change Log. Confirm existing-item selection and required Anchor Chain dependency before **Submit Mod**. Do NOT choose Create New or create a second Workshop item. The game's Mod Creation guide confirms the Update Existing flow.
+Start Sea Power > Mod Manager > Create Mod. Tick **Update Existing**, select the existing **Camera Offset & Workspace Snapshots** entry (Workshop ID **3844350230**), **Pick Folder** and select the exact `CameraOffsetWorkspaceSnapshots_v102_Upload` folder (enter it in the picker if necessary; don't select StreamingAssets itself). Keep existing preview image/title/description, and use `RELEASE_NOTES.md` for the Change Log. Confirm existing-item selection and required Anchor Chain dependency before **Submit Mod**. Do NOT choose Create New or create a second Workshop item. The game's Mod Creation guide confirms the Update Existing flow.
 
 If selecting a preview picture, choose the existing square thumbnail from your **Downloads** folder; do not place the thumbnail into this staging directory.
 
@@ -82,8 +82,8 @@ Launch the game, check the version and slider, and verify original camera/worksp
 From a **clean clone** of the existing repository, copy the updated source and docs, review the changes, and commit without force-pushing. Example:
 
 ```powershell
-$source = "$env:USERPROFILE\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.1"
-$repo = "$env:USERPROFILE\Downloads\sea-power-camera-offset-workspace-snapshots-github-v101"
+$source = "$env:USERPROFILE\Downloads\sea-power-camera-offset-workspace-snapshots-v1.0.2"
+$repo = "$env:USERPROFILE\Downloads\sea-power-camera-offset-workspace-snapshots-github-v102"
 git clone https://github.com/fatmike-slo/sea-power-camera-offset-workspace-snapshots.git $repo
 if ($LASTEXITCODE -ne 0) { throw 'Clone failed' }
 if ((git -C $repo status --porcelain)) { throw 'Clone is not clean' }
@@ -105,13 +105,13 @@ Review the source diff before publishing. The test-only files in the old reposit
 ```powershell
 git add README.md CHANGELOG.md RELEASE_NOTES.md SOURCE_SHA256SUMS.txt LICENSE .gitignore docs src tools workshop CameraOffsetWorkspaceSnapshotsRelease.ps1 InspectUiMethods.ps1
 git diff --cached --check
-git commit -m "Release v1.0.1: adjustable UI scaling"
+git commit -m "Release v1.0.2: adjustable UI scaling"
 git push origin HEAD
-git tag v1.0.1
-git push origin v1.0.1
+git tag v1.0.2
+git push origin v1.0.2
 ```
 
-On GitHub, create a release from tag `v1.0.1` and attach `dist/CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip` and `dist/SHA256SUMS.txt`. Use `RELEASE_NOTES.md` as release text. Keep v1.0.0 intact and do not commit the compiled DLL or Sea Power assemblies.
+On GitHub, create a release from tag `v1.0.2` and attach `dist/CameraOffset_WorkspaceSnapshots_v1.0.2_Workshop.zip` and `dist/SHA256SUMS.txt`. Use `RELEASE_NOTES.md` as release text. Keep v1.0.0 intact and do not commit the compiled DLL or Sea Power assemblies.
 
 Avoid `git push --force`, removing the repository or making a new Workshop item.
 

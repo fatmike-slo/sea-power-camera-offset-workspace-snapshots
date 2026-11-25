@@ -1,45 +1,45 @@
-﻿# Guarded v1.0.1 public release controller. Windows PowerShell 5.1.
-# Reuses the exact, in-game-tested RC2 DLL; no rebuild, no Steam credentials, no upload automation.
+﻿# Guarded v1.0.2 public release controller. Windows PowerShell 5.1.
+# Reuses the exact, in-game-tested RC1 DLL; no rebuild, no Steam credentials, no upload automation.
 [CmdletBinding()]
 param(
     [ValidateSet('Check','Package','VerifyPackage','Stage','VerifyStage','Clean','VerifyWorkshop')]
     [string]$Action = 'Check',
-    [string]$RC2Dir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'sea-power-camera-offset-workspace-snapshots-v1.0.1_RC2'),
+    [string]$RC1Dir = (Join-Path (Split-Path -Parent $PSScriptRoot) 'sea-power-camera-offset-workspace-snapshots-v1.0.2_RC1'),
     [string]$GameDir = 'C:\Program Files (x86)\Steam\steamapps\common\Sea Power'
 )
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$expectedHash = '787F55887C3BBC30E485087E10D2054835DACCE80DDAB920DAF4437564F0E3C2'
-$rc2Build = Join-Path $RC2Dir '_camera-workspace-v101-rc2-test\CameraOffsetWorkspaceSnapshotsV101RC2Test\CustomCameraOffset.dll'
-$rc2State = Join-Path $RC2Dir '_camera-workspace-v101-rc2-test\test-state.json'
-$rc2Installed = Join-Path $GameDir 'Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshotsV101RC2Test\CustomCameraOffset.dll'
+$expectedHash = '57C3C417C12CFED185AA217AEDFC5FE2CF5C32D2A7A2B15DAA7AF737EFBB1E33'
+$rc1Build = Join-Path $RC1Dir '_camera-workspace-v102-rc1-test\CameraOffsetWorkspaceSnapshotsV102RC1Test\CustomCameraOffset.dll'
+$rc1State = Join-Path $RC1Dir '_camera-workspace-v102-rc1-test\test-state.json'
+$rc1Installed = Join-Path $GameDir 'Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshotsV102RC1Test\CustomCameraOffset.dll'
 $manualDll = Join-Path $GameDir 'BepInEx\plugins\CustomCameraOffset\CustomCameraOffset.dll'
 $workshopDll = Join-Path (Split-Path -Parent (Split-Path -Parent $GameDir)) 'workshop\content\1286220\3844350230\CustomCameraOffset.dll'
 $dist = Join-Path $root 'dist'
 $packageDir = Join-Path $dist 'CameraOffsetWorkspaceSnapshots'
 $packageDll = Join-Path $packageDir 'CustomCameraOffset.dll'
 $packageIni = Join-Path $packageDir '_info.ini'
-$packageZip = Join-Path $dist 'CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip'
-$packageState = Join-Path $dist 'v1.0.1-release-state.json'
-$stageDir = Join-Path $GameDir 'Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshots_v101_Upload'
-$stageState = Join-Path $dist 'v1.0.1-workshop-stage.json'
+$packageZip = Join-Path $dist 'CameraOffset_WorkspaceSnapshots_v1.0.2_Workshop.zip'
+$packageState = Join-Path $dist 'v1.0.2-release-state.json'
+$stageDir = Join-Path $GameDir 'Sea Power_Data\StreamingAssets\CameraOffsetWorkspaceSnapshots_v102_Upload'
+$stageState = Join-Path $dist 'v1.0.2-workshop-stage.json'
 function HashOf([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToUpperInvariant() }
 function RequireFile([string]$p) { if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { throw "Expected file is missing: $p" } }
 function RequireClosed { if (Get-Process -Name 'Sea Power' -ErrorAction SilentlyContinue) { throw 'Fully exit Sea Power before changing files.' } }
 function RequireTestDll {
-    RequireFile $rc2Build
-    $h = HashOf $rc2Build
-    if ($h -ne $expectedHash) { throw "RC2 DLL differs from tested build. Expected $expectedHash; got $h" }
-    if (Test-Path -LiteralPath $rc2State -PathType Leaf) {
-        $s = Get-Content -LiteralPath $rc2State -Raw | ConvertFrom-Json
-        if ($s.Version -ne 'CameraOffsetWorkspaceSnapshots-v1.0.1-rc2' -or
+    RequireFile $rc1Build
+    $h = HashOf $rc1Build
+    if ($h -ne $expectedHash) { throw "RC1 DLL differs from tested build. Expected $expectedHash; got $h" }
+    if (Test-Path -LiteralPath $rc1State -PathType Leaf) {
+        $s = Get-Content -LiteralPath $rc1State -Raw | ConvertFrom-Json
+        if ($s.Version -ne 'CameraOffsetWorkspaceSnapshots-v1.0.2-rc1' -or
             $s.StageDllHash -ne $expectedHash -or $s.GameDir -ine $GameDir) {
-            throw 'RC2 test-state does not match the verified DLL/version/game path.'
+            throw 'RC1 test-state does not match the verified DLL/version/game path.'
         }
-        RequireFile $rc2Installed
-        if ((HashOf $rc2Installed) -ne $expectedHash) { throw 'Installed RC2 test DLL differs from tested build.' }
+        RequireFile $rc1Installed
+        if ((HashOf $rc1Installed) -ne $expectedHash) { throw 'Installed RC1 test DLL differs from tested build.' }
     }
-    Write-Host "TESTED RC2 DLL VERIFIED: $h" -ForegroundColor Green
+    Write-Host "TESTED RC1 DLL VERIFIED: $h" -ForegroundColor Green
 }
 function VerifySources {
     RequireFile (Join-Path $root 'SOURCE_SHA256SUMS.txt')
@@ -56,15 +56,15 @@ function VerifySources {
     $actualFiles = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -File | ForEach-Object { 'src/' + $_.Name })
     if (@($actualFiles | Where-Object { $_ -notin $knownFiles }).Count -ne 0) { throw 'Unexpected source files found.' }
     $plugin = Get-Content -LiteralPath (Join-Path $root 'src\Plugin.cs') -Raw
-    if ($plugin -notmatch '\[BepInPlugin\("local\.seapower\.customcameraoffset",\s*"Camera Offset & Workspace Snapshots",\s*"1\.0\.1"\)\]') {
-        throw 'Public source is not Camera Offset & Workspace Snapshots v1.0.1.'
+    if ($plugin -notmatch '\[BepInPlugin\("local\.seapower\.customcameraoffset",\s*"Camera Offset & Workspace Snapshots",\s*"1\.0\.2"\)\]') {
+        throw 'Public source is not Camera Offset & Workspace Snapshots v1.0.2.'
     }
 }
 function VerifyPublicIni {
     $p = Join-Path $root 'workshop\_info.ini'
     RequireFile $p
     $raw = Get-Content -LiteralPath $p -Raw
-    if ($raw -notmatch 'Name=Camera Offset & Workspace Snapshots' -or $raw -notmatch 'v1\.0\.1' -or $raw -match 'TEST|RC2') {
+    if ($raw -notmatch 'Name=Camera Offset & Workspace Snapshots' -or $raw -notmatch 'v1\.0\.2' -or $raw -match 'TEST|RC1') {
         throw 'Public Workshop _info.ini is missing or still labelled TEST.'
     }
     return $p
@@ -72,7 +72,7 @@ function VerifyPublicIni {
 function GetPackage {
     RequireFile $packageState
     $s = Get-Content -LiteralPath $packageState -Raw | ConvertFrom-Json
-    if ($s.Version -ne 'v1.0.1' -or $s.DllHash -ne $expectedHash) { throw 'Release state/version/hash mismatch.' }
+    if ($s.Version -ne 'v1.0.2' -or $s.DllHash -ne $expectedHash) { throw 'Release state/version/hash mismatch.' }
     RequireFile $packageDll
     RequireFile $packageIni
     RequireFile $packageZip
@@ -108,7 +108,7 @@ function RequireNoOtherDlls([string]$allowedDll) {
 function GetStaging {
     RequireFile $stageState
     $s = Get-Content -LiteralPath $stageState -Raw | ConvertFrom-Json
-    if ($s.Version -ne 'v1.0.1' -or $s.Destination -ine $stageDir -or $s.DllHash -ne $expectedHash) {
+    if ($s.Version -ne 'v1.0.2' -or $s.Destination -ine $stageDir -or $s.DllHash -ne $expectedHash) {
         throw 'Steam staging state mismatch.'
     }
     if (-not (Test-Path -LiteralPath $stageDir -PathType Container)) { throw 'Staged directory missing.' }
@@ -130,9 +130,9 @@ switch ($Action) {
         RequireTestDll
         [pscustomobject]@{
             ReleaseSource = $root
-            RC2Build = $rc2Build
-            TestStateExists = (Test-Path -LiteralPath $rc2State)
-            LocalTestDLLExists = (Test-Path -LiteralPath $rc2Installed)
+            RC1Build = $rc1Build
+            TestStateExists = (Test-Path -LiteralPath $rc1State)
+            LocalTestDLLExists = (Test-Path -LiteralPath $rc1Installed)
             ManualPluginExists = (Test-Path -LiteralPath $manualDll)
             WorkshopSubscribedDllExists = (Test-Path -LiteralPath $workshopDll)
             PackageExists = (Test-Path -LiteralPath $packageState)
@@ -149,20 +149,20 @@ switch ($Action) {
         if (Test-Path -LiteralPath $packageDir) { throw "Release folder already exists: $packageDir" }
         New-Item -Path $dist -ItemType Directory -Force | Out-Null
         New-Item -Path $packageDir -ItemType Directory -Force | Out-Null
-        Copy-Item -LiteralPath $rc2Build -Destination $packageDll -ErrorAction Stop
+        Copy-Item -LiteralPath $rc1Build -Destination $packageDll -ErrorAction Stop
         Copy-Item -LiteralPath (Join-Path $root 'workshop\_info.ini') -Destination $packageIni -ErrorAction Stop
         Compress-Archive -LiteralPath $packageDir -DestinationPath $packageZip -CompressionLevel Optimal -ErrorAction Stop
         $dllHash = HashOf $packageDll
         $iniHash = HashOf $packageIni
         $zipHash = HashOf $packageZip
-        [pscustomobject]@{ Version='v1.0.1'; DllHash=$dllHash; IniHash=$iniHash; ZipHash=$zipHash;
-            TestedRC2Path=$rc2Build; SourceArchiveType='Tested RC2 DLL plus public Workshop metadata';
+        [pscustomobject]@{ Version='v1.0.2'; DllHash=$dllHash; IniHash=$iniHash; ZipHash=$zipHash;
+            TestedRC1Path=$rc1Build; SourceArchiveType='Tested RC1 DLL plus public Workshop metadata';
             WorkshopItemID='3844350230' } | ConvertTo-Json -Depth 4 |
                 Set-Content -LiteralPath $packageState -Encoding UTF8 -ErrorAction Stop
-        @("$dllHash  CameraOffsetWorkspaceSnapshots/CustomCameraOffset.dll", "${zipHash}  CameraOffset_WorkspaceSnapshots_v1.0.1_Workshop.zip") |
+        @("$dllHash  CameraOffsetWorkspaceSnapshots/CustomCameraOffset.dll", "${zipHash}  CameraOffset_WorkspaceSnapshots_v1.0.2_Workshop.zip") |
             Set-Content -LiteralPath (Join-Path $dist 'SHA256SUMS.txt') -Encoding Ascii
         [void](GetPackage)
-        Write-Host 'PUBLIC v1.0.1 PACKAGE OK — tested RC2 DLL reused, unchanged.' -ForegroundColor Green
+        Write-Host 'PUBLIC v1.0.2 PACKAGE OK — tested RC1 DLL reused, unchanged.' -ForegroundColor Green
         Write-Host "Workshop ZIP: $packageZip"
         Write-Host "DLL SHA256: $dllHash"
         Write-Host "ZIP SHA256: $zipHash"
@@ -175,8 +175,8 @@ switch ($Action) {
         RequireClosed
         $s = GetPackage
         [void]$s
-        if ((Test-Path -LiteralPath $rc2State -PathType Leaf) -or (Test-Path -LiteralPath $rc2Installed -PathType Leaf)) {
-            throw 'RC2 local test is still installed. Run RC2 -Action Verify then -Action Rollback before Workshop staging.'
+        if ((Test-Path -LiteralPath $rc1State -PathType Leaf) -or (Test-Path -LiteralPath $rc1Installed -PathType Leaf)) {
+            throw 'RC1 local test is still installed. Run RC1 -Action Verify then -Action Rollback before Workshop staging.'
         }
         if ((Test-Path -LiteralPath $stageState -PathType Leaf) -or (Test-Path -LiteralPath $stageDir)) {
             throw 'Workshop stage already exists. Inspect it instead of overwriting.'
@@ -185,7 +185,7 @@ switch ($Action) {
         New-Item -Path $stageDir -ItemType Directory -ErrorAction Stop | Out-Null
         Copy-Item -LiteralPath $packageDll -Destination (Join-Path $stageDir 'CustomCameraOffset.dll') -ErrorAction Stop
         Copy-Item -LiteralPath $packageIni -Destination (Join-Path $stageDir '_info.ini') -ErrorAction Stop
-        [pscustomobject]@{ Version='v1.0.1'; DllHash=$expectedHash; IniHash=HashOf $packageIni;
+        [pscustomobject]@{ Version='v1.0.2'; DllHash=$expectedHash; IniHash=HashOf $packageIni;
             Destination=$stageDir; WorkshopItemID='3844350230' } |
                 ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $stageState -Encoding UTF8 -ErrorAction Stop
         [void](GetStaging)
@@ -209,13 +209,13 @@ switch ($Action) {
     'VerifyWorkshop' {
         RequireClosed
         if (Test-Path -LiteralPath $stageDir) { throw 'Temporary upload stage is still present; run Clean.' }
-        if (Test-Path -LiteralPath $rc2Installed) { throw 'Local RC2 test is still installed; run Rollback.' }
+        if (Test-Path -LiteralPath $rc1Installed) { throw 'Local RC1 test is still installed; run Rollback.' }
         if (Test-Path -LiteralPath $manualDll) { throw 'Manual BepInEx DLL conflict detected.' }
         RequireFile $workshopDll
         $h = HashOf $workshopDll
-        if ($h -ne $expectedHash) { throw "Workshop subscriber DLL is NOT v1.0.1. Expected $expectedHash; got $h. Steam may still be downloading." }
+        if ($h -ne $expectedHash) { throw "Workshop subscriber DLL is NOT v1.0.2. Expected $expectedHash; got $h. Steam may still be downloading." }
         RequireNoOtherDlls $workshopDll
-        Write-Host 'WORKSHOP v1.0.1 VERIFY OK — subscribed DLL matches the tested RC2 build.' -ForegroundColor Green
+        Write-Host 'WORKSHOP v1.0.2 VERIFY OK — subscribed DLL matches the tested RC1 build.' -ForegroundColor Green
         Write-Host "Workshop location: $workshopDll"
     }
 }

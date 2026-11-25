@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 namespace CustomCameraOffset
 {
-    [BepInPlugin("local.seapower.customcameraoffset", "Camera Offset & Workspace Snapshots", "1.0.1")]
+    [BepInPlugin("local.seapower.customcameraoffset", "Camera Offset & Workspace Snapshots", "1.0.2")]
     public sealed partial class Plugin : BaseUnityPlugin
     {
         private const float MaximumOffset = 0.40f; // Fraction of the entire viewport.
@@ -107,7 +107,7 @@ namespace CustomCameraOffset
             // if the other pipeline is active. Also apply in LateUpdate as a backup.
             Camera.onPreCull += OnCameraPreCull;
             RenderPipelineManager.beginCameraRendering += OnBeginCameraRendering;
-            Logger.LogInfo("Camera Offset & Workspace Snapshots v1.0.1 RC2 loaded; labeled mini launcher, graphical quick layouts and collapsible snapshots.");
+            Logger.LogInfo("Camera Offset & Workspace Snapshots v1.0.2 RC1 loaded; labeled mini launcher, graphical quick layouts and collapsible snapshots.");
         }
 
         private void OnDestroy()
@@ -610,7 +610,7 @@ namespace CustomCameraOffset
                 _window.y = Mathf.Clamp(_window.y, 0f, Mathf.Max(0f, logicalHeight - _window.height));
                 GUI.depth = -1000;
                 _window = GUI.Window(WindowId, _window, DrawWindow,
-                    "Camera Offset & Workspace Snapshots v1.0.1");
+                    "Camera Offset & Workspace Snapshots v1.0.2");
                 GUI.BringWindowToFront(WindowId);
                 Event ev = Event.current;
                 if (ev != null && ev.isMouse &&

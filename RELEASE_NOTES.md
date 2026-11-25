@@ -1,18 +1,15 @@
-# v1.0.1 — High-DPI UI Scaling
+# v1.0.2 — Extended UI scaling to 300%
 
-This update makes **Camera Offset & Workspace Snapshots** easier to use on 1440p and 4K monitors.
+Based on player feedback, the manual UI Size slider now goes from 100% to 300%, with 1% precision. Players on large or high-resolution screens can choose sizes such as 250%.
 
-- **UI Size slider:** Set the interface anywhere between 100% and 200% in 1% steps.
-- **Automatic scaling:** The mod adapts to higher-resolution displays (100% at 1080p, 125% at 1440p, 175% at 4K).
-- **Both windows scale:** Main controls and the compact launcher.
-- **Improved usability:** Mouse interaction, dragging, window bounds and size persistence account for scaling.
+Automatic scaling remains unchanged. The main panel and compact launcher continue to scale together, with screen-fit limits protecting smaller displays.
 
-The camera system, eight quick map layouts, four workspace snapshots and Ctrl + Shift + U shortcut are unchanged.
+Camera framing, eight quick map layouts, four workspace snapshots and the Ctrl + Shift + U shortcut are unchanged.
 
-**Requires:** Sea Power and Anchor Chain v1.2. Existing settings are preserved.
+Requires Anchor Chain v1.2. After subscribing or updating, verify the mod is checked in the Sea Power Mod Manager and **restart Sea Power**.
 
 Steam Workshop: https://steamcommunity.com/sharedfiles/filedetails/?id=3844350230
 
 ### Steam Workshop change note
 
-v1.0.1: Added automatic 4K/high-resolution UI scaling and a continuous 100–200% UI-size slider. The main panel and launcher now scale together. Camera, quick layouts and workspace snapshots are unchanged.
+v1.0.2: Extended the manual UI Size slider to 100–300% (previously 200%). Especially useful for 4K displays. Automatic scaling and all camera/workspace features are unchanged. After the update, check the mod in the in-game Mod Manager and restart Sea Power.
